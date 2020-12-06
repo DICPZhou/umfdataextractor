@@ -2,9 +2,6 @@
 """
 chemdataextractor.parse.table
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-
-
 """
 
 from __future__ import absolute_import
@@ -13,16 +10,15 @@ from __future__ import print_function
 from __future__ import unicode_literals
 import logging
 import re
-from lxml.builder import E
 
 from ..utils import first
 from ..model import Compound, Velocity, GasViscosity, GasDensity
-from ..model import ParticleDiameter, ParticleDensity, GasDensity, GasViscosity, Velocity, Sphericity, BedVoidage, TabelPress, TabelTemp
-# from ..model import  UvvisSpectrum, UvvisPeak, QuantumYield, FluorescenceLifetime, MeltingPoint, GlassTransition
-# from ..model import ElectrochemicalPotential, IrSpectrum, IrPeak
+from ..model import ParticleDiameter, ParticleDensity, GasDensity, \
+    GasViscosity, Velocity, Sphericity, BedVoidage, TabelPress, TabelTemp
+
 from .actions import join, merge, fix_whitespace
 from .base import BaseParser
-# from .cem import chemical_label, label_before_name, chemical_name, chemical_label_phrase, solvent_name, lenient_chemical_label
+
 from .cem import particle_label, lenient_particle_label
 from .elements import R, I, W, Optional, ZeroOrMore, Any, OneOrMore, Start, End, Group, Not, T
 from ..parse.common import lbrct, rbrct, comma, stop
@@ -36,23 +32,25 @@ name_blacklist = R(r'^([\d\.]+)$')
 '''1. 颗粒属性定义'''
 #: Compound identifier column heading
 compound_heading = R('(^|\b)(comp((oun)?d)?|Geldart group|\b)', re.I)  # solid,|particle
-
-compound_cell = Group((Start() + particle_label + End())('material') | (Start() + lenient_particle_label + End())('material'))('material_phrase')
+compound_cell = Group((Start() + particle_label + End())('material') |
+                      (Start() + lenient_particle_label + End())('material'))('material_phrase')
 
 '''2.颗粒直径定义'''
 particle_diameter_title = (
     R('^ds$|d32|APS|dv$|dsv$') |
     (R('[Pp]article') + R('diameter') + Optional(comma) + R('[dσ]')) |
-    (R('Particle[s]?|Average|Mean|[Ss]olid|[Dd]?sauter|Sand|Surface|Equivalent|True|Arithmetic|Sauter|[Ww]eighted|Brouckere|Harmonic')
-     + Optional(W('solid')) + Optional(R('mean|average')) + Optional(R('particle|material')) + R('size|diam', re.I) + Optional('of') + Optional(R('particle'))
+    (R('Particle[s]?|Average|Mean|[Ss]olid|[Dd]?sauter|Sand|Surface|Equivalent|True|Arithmetic|Sauter'
+       '|[Ww]eighted|Brouckere|Harmonic') + Optional(W('solid')) + Optional(R('mean|average'))
+     + Optional(R('particle|material')) + R('size|diam', re.I) + Optional('of') + Optional(R('particle'))
      + Optional(lbrct) + Optional(comma) + Optional(R('dP?', re.I)) + Optional(R('f$|p$|ρ$'))) |
     (R('particle') + R('size|diameter') + Not(W('×'))) |  # 排除形状为圆柱形的物体
     (R('Diameter') + Optional(lbrct) + W('dp') + Optional(rbrct)) |
-    (R('Diameter') + Optional(W('of') | comma) + Optional(W('the')) + Not(W('gas')) + Not(W('bed')) + Not(W('column')) + R('particle|dp$|range|d$', re.I)) |
+    (R('Diameter') + Optional(W('of') | comma) + Optional(W('the')) + Not(W('gas')) + Not(W('bed')) + Not(W('column'))
+     + R('particle|dp$|range|d$', re.I)) |
     (R('avg') + Optional(stop) + R('diam')) |
     (R('dp$') + W(',') + R('avg|sph|L$|D$|SM$')) |
     (Start() + R('dp$') + W(',') + R('m|s')) |
-    (Start() + R('^[Dd][Pp]?$') + Optional(R('p$', re.I)) + Not(W('<'))) |  #  | W('/')
+    (Start() + R('^[Dd][Pp]?$') + Optional(R('p$', re.I)) + Not(W('<'))) |  # | W('/')
     (Start() + R('^d$') + R('p$', re.I) + Not(W('<') | W('/'))) |
     (Start() + R('dpe$')) |  # pe: mixing particles
     (Start() + W('Diameter') + Optional(comma) + Not(W('mm') | W('of') | (W('[') + W('m')))) |
@@ -96,11 +94,15 @@ spaced_range1 = (
         OneOrMore(R(r'^[\+\-–−]?\d+(\.d+)?(\(\d\))?$') + R(r'^[\-±–−~∼˜]$') + R(r'^[\+\-–−]?\d+(\.\d+)?(\(\d\))?$'))
 )('value').add_action(join)
 
-to_range = (ZeroOrMore(R(r'^[\+\-–−]?\d+(\.\d+)?(\(\d\))?$') + Optional(particle_diameter_units).hide()) + Optional(I('to')) + R(r'^[\+\-–−]?\d+(\.\d+)?(\(\d\))?$')
+to_range = (
+        ZeroOrMore(R(r'^[\+\-–−]?\d+(\.\d+)?(\(\d\))?$') + Optional(particle_diameter_units).hide())
+            + Optional(I('to')) + R(r'^[\+\-–−]?\d+(\.\d+)?(\(\d\))?$')
             )('value').add_action(join)
 
 to_range2 = (
-        (R(r'^[\+\-–−]?\d+(\.\d+)?(\(\d\))?$') + I('<') + Optional(W('dp'))) + I('<') + R(r'^[\+\-–−]?\d+(\.\d+)?(\(\d\))?$')
+        (
+        R(r'^[\+\-–−]?\d+(\.\d+)?(\(\d\))?$') + I('<') + Optional(W('dp')))
+        + I('<') + R(r'^[\+\-–−]?\d+(\.\d+)?(\(\d\))?$')
             )('value').add_action(join)
 
 and_range = (OneOrMore(R(r'^[\+\-–−]?\d+(\.\d+)?(\(\d\))?$') + Optional(particle_diameter_units).hide() + comma)
@@ -127,20 +129,24 @@ power = (
 
 particle_diameter_value = (power | range1 | value)('particle_diameter_value')
 
-table_particle_diameter_cell = (OneOrMore(particle_diameter_value) + Optional(delims.hide()) + Optional(particle_diameter_units))('particle_diameter_cell')
+table_particle_diameter_cell = (OneOrMore(particle_diameter_value) + Optional(delims.hide())
+                                + Optional(particle_diameter_units))('particle_diameter_cell')
 
 '''3. 颗粒密度定义'''
 particle_density_title = (
-    (R('[Pp]articles?|Theoreti|Real|[Mm]aterial|True|Actual|[Ss]olid|Bed|[Ss]kelet|Jetsam|[Aa]pparent') + Optional(W('particle'))
-     + Optional(W('solid')) + R('[Dd]ens') + Optional(W(',') | W('(')) + Optional(R('^ρ[ps]?')) + Optional(R('^s|^p|^f', re.I))) |
+    (R('[Pp]articles?|Theoreti|Real|[Mm]aterial|True|Actual|[Ss]olid|Bed|[Ss]kelet|Jetsam|[Aa]pparent')
+     + Optional(W('particle')) + Optional(W('solid')) + R('[Dd]ens') + Optional(W(',') | W('('))
+     + Optional(R('^ρ[ps]?')) + Optional(R('^s|^p|^f', re.I))) |
     (R('[Dd]ensity') + W('of') + R('sorbent|particles?') + Optional(comma) + R('ρ[Ps]?$', re.I) + Optional(
         R('[ps]', re.I))) |
     (R('Density') + Optional(lbrct) + W('ρ') + Optional(rbrct)) |
     (R('Density') + Optional(comma) + Optional(W('of')) + Optional(comma) + R('ρ[^g]?P|particle')) |
-    (R('[Dd]ensity') + Optional(comma) + Optional(W('of')) + Optional(comma) + R('ρ$') + R('[ps]', re.I) + Optional(W('['))) |
+    (R('[Dd]ensity') + Optional(comma) + Optional(W('of')) + Optional(comma) + R('ρ$') + R('[ps]', re.I)
+     + Optional(W('['))) |
     (Start() + R('^ρ[Pps]?$', re.I) + Optional(R('^[Pps]$', re.I)) + W('(') + Optional(R('part') + R('dens'))) |
     (Start() + R('^ρ$', re.I) + R('^[ps]$', re.I) + W(',') + R('real|d')) |
-    (Start() + R('^ρ$', re.I) + R('^[ps]$', re.I) + Not(W('/') + R('^ρ$', re.I))) |  # + Not(W('/'))) |  # ρap: apparent density
+    (Start() + R('^ρ$', re.I) + R('^[ps]$', re.I) + Not(W('/') + R('^ρ$', re.I))) |
+    # + Not(W('/'))) |  # ρap: apparent density
     (W('Density') + W('of') + W('bed') + R('materials?')) |
     (R('^ρ$|ρ$', re.I) + End()) |
     (R('^ρ$', re.I) + R('L$|D$|mf?$|sk$|ps$|pe$|^[Ss]$')) |  # pe: mixing particles
@@ -171,13 +177,18 @@ particle_density_heading = (
 
 joined_range = R(r'^[\+\-–−]?\d+(\.\\d+)?(\(\d\))?[\-––-−~∼˜]\d+(\.\d+)?(\(\d\))?$')('value').add_action(join)
 
-spaced_range = (R(r'^[\+\-–−]?\d+(\.d+)?(\(\d\))?$') + Optional(particle_density_units).hide() + (R(r'^[\-±–−~∼˜]$') + R(r'^[\+\-–−]?\d+(\.\d+)?(\(\d\))?$') | R(r'^[\+\-–−]\d+(\.\d+)?(\(\d\))?$')))('value').add_action(join)
+spaced_range = (R(r'^[\+\-–−]?\d+(\.d+)?(\(\d\))?$') + Optional(particle_density_units).hide()
+                + (R(r'^[\-±–−~∼˜]$') + R(r'^[\+\-–−]?\d+(\.\d+)?(\(\d\))?$') | R(r'^[\+\-–−]\d+(\.\d+)?(\(\d\))?$'))
+                )('value').add_action(join)
 
-to_range = (OneOrMore(R(r'^[\+\-–−]?\d+(\.\d+)?(\(\d\))?$') + Optional(particle_density_units).hide()) + I('to') + R(r'^[\+\-–−]?\d+(\.\d+)?(\(\d\))?$'))('value').add_action(join)
+to_range = (OneOrMore(R(r'^[\+\-–−]?\d+(\.\d+)?(\(\d\))?$') + Optional(particle_density_units).hide())
+            + I('to') + R(r'^[\+\-–−]?\d+(\.\d+)?(\(\d\))?$'))('value').add_action(join)
 
-to_range2 = ((R(r'^[\+\-–−]?\d+(\.\d+)?(\(\d\))?$') + I('<') + Optional(W('dp'))) + I('<') + R(r'^[\+\-–−]?\d+(\.\d+)?(\(\d\))?$'))('value').add_action(join)
+to_range2 = ((R(r'^[\+\-–−]?\d+(\.\d+)?(\(\d\))?$') + I('<') + Optional(W('dp'))) + I('<')
+             + R(r'^[\+\-–−]?\d+(\.\d+)?(\(\d\))?$'))('value').add_action(join)
 
-and_range = (OneOrMore(R(r'^[\+\-–−]?\d+(\.\d+)?(\(\d\))?$') + Optional(particle_density_units).hide() + Optional(comma))
+and_range = (
+        OneOrMore(R(r'^[\+\-–−]?\d+(\.\d+)?(\(\d\))?$') + Optional(particle_density_units).hide() + Optional(comma))
              + Optional(I('and') | comma).hide() + R(r'^[\+\-–−]?\d+(\.\d+)?(\(\d\))?$'))('value').add_action(join)
 
 range1 = (and_range | to_range2 | to_range | spaced_range | joined_range).add_action(join)
@@ -228,7 +239,8 @@ particle_sphericity_cell = particle_sphericity_value('particle_sphericity_cell')
 
 '''最小流化时床层空隙率'''
 bed_voidage_title = (
-    (Optional(R('bed', re.I)) + R('voidage|ε|ɛ', re.I) + Optional(W('g') | W('s')| W('m')) + Optional(delims) + Optional(lbrct) + Optional(R('mf', re.I))
+    (Optional(R('bed', re.I)) + R('voidage|ε|ɛ', re.I) + Optional(W('g') | W('s')| W('m'))
+     + Optional(delims) + Optional(lbrct) + Optional(R('mf', re.I))
      + Optional(R('ε', re.I)) + Optional(rbrct) + Not(R('[^bax]'))) |
     (R('fraction', re.I) + W('at') + R('minimum', re.I) + R('fluidiz', re.I) + R('vel', re.I)) |
     (R('minimum', re.I) + W('void') + R('age', re.I)) |
@@ -266,16 +278,21 @@ gas_density_units = (
         (R('[Kk]?g') + Optional(stop) + R(r'[c]?m[\-–−]?3?'))
 )('gas_density_units').add_action(merge)
 
-gas_density_heading = (gas_density_title.hide() + Optional(delims.hide()) + Optional(gas_density_units))('gas_density_heading')
-# gas_density_heading = Group(Start() + gas_density_title.hide() + Optional(delims.hide()) + Optional(gas_density_units) + End())('gas_density_heading')
+gas_density_heading = (gas_density_title.hide() + Optional(delims.hide())
+                       + Optional(gas_density_units))('gas_density_heading')
 
 joined_range = OneOrMore(R(r'^[\+\-–−]?\d+(\.\d+)?(\(\d\))?[\-––-−~∼˜]\d+(\.\d+)?(\(\d\))?$'))('value').add_action(join)
 
-spaced_range = (R(r'^[\+\-–−]?\d+(\.d+)?(\(\d\))?$') + Optional(gas_density_units).hide() + (R(r'^[\-±–−~∼˜]$') + R(r'^[\+\-–−]?\d+(\.\d+)?(\(\d\))?$') | R(r'^[\+\-–−]\d+(\.\d+)?(\(\d\))?$')))('value').add_action(join)
+spaced_range = (
+        R(r'^[\+\-–−]?\d+(\.d+)?(\(\d\))?$') + Optional(gas_density_units).hide()
+        + (R(r'^[\-±–−~∼˜]$') + R(r'^[\+\-–−]?\d+(\.\d+)?(\(\d\))?$') | R(r'^[\+\-–−]\d+(\.\d+)?(\(\d\))?$'))
+)('value').add_action(join)
 
-to_range = (ZeroOrMore(R(r'^[\+\-–−]?\d+(\.\d+)?(\(\d\))?$') + Optional(gas_density_units).hide()) + Optional(I('to')) + R(r'^[\+\-–−]?\d+(\.\d+)?(\(\d\))?$'))('value').add_action(join)
+to_range = (ZeroOrMore(R(r'^[\+\-–−]?\d+(\.\d+)?(\(\d\))?$') + Optional(gas_density_units).hide())
+            + Optional(I('to')) + R(r'^[\+\-–−]?\d+(\.\d+)?(\(\d\))?$'))('value').add_action(join)
 
-to_range2 = ((R(r'^[\+\-–−]?\d+(\.\d+)?(\(\d\))?$') + I('<') + Optional(W('dp'))) + I('<') + R(r'^[\+\-–−]?\d+(\.\d+)?(\(\d\))?$'))('value').add_action(join)
+to_range2 = ((R(r'^[\+\-–−]?\d+(\.\d+)?(\(\d\))?$') + I('<') + Optional(W('dp'))) + I('<')
+             + R(r'^[\+\-–−]?\d+(\.\d+)?(\(\d\))?$'))('value').add_action(join)
 
 and_range = (OneOrMore(R(r'^[\+\-–−]?\d+(\.\d+)?(\(\d\))?$') + Optional(gas_density_units).hide() + Optional(comma))
              + Optional(I('and') | comma).hide() + R(r'^[\+\-–−]?\d+(\.\d+)?(\(\d\))?$'))('value').add_action(join)
@@ -297,13 +314,15 @@ power = (
 
 gas_density_value = (power | range1 | value)('gas_density_value')
 
-gas_density_cell = (OneOrMore(gas_density_value) + Optional(delims.hide()) + Optional(gas_density_units))('gas_density_cell')  # + Optional(gas_density_units)
+gas_density_cell = (
+        OneOrMore(gas_density_value) + Optional(delims.hide()) + Optional(gas_density_units)
+)('gas_density_cell')  # + Optional(gas_density_units)
 
 
 '''5.气体粘度定义'''
 gas_viscosity_title = (
         (R('[vv]iscosity') + W('of') + W('gas') + Optional(comma) + R('μ|μ') + W('g')) |
-        (Optional(R('gas', re.I)) + R('viscosity|μg|ηg|viscidity', re.I) + Optional(comma) + Optional(R('μ') + W('g'))) |
+        (Optional(R('gas', re.I)) + R('viscosity|μg|ηg|viscid', re.I) + Optional(comma) + Optional(R('μ') + W('g'))) |
         (Start() + R('μ|μ') + W('g')) |
         (Start() + R('μ|μ') + W('gas')) |
         (Start() + R('μ') + W('/') + R('[kK]g')) |
@@ -321,15 +340,22 @@ gas_viscosity_units = (
     (W('kg') + W('m') + W('−') + W('1'))
 )('gas_viscosity_units').add_action(merge)
 
-gas_viscosity_heading = (OneOrMore(gas_viscosity_title.hide()) + Optional(delims.hide()) + Optional(gas_viscosity_units))('gas_viscosity_heading')
+gas_viscosity_heading = (
+        OneOrMore(gas_viscosity_title.hide()) + Optional(delims.hide()) + Optional(gas_viscosity_units)
+)('gas_viscosity_heading')
 
 joined_range = R(r'^[\+\-–−]?\d+(\.\\d+)?(\(\d\))?[\-––-−~∼˜]\d+(\.\d+)?(\(\d\))?$')('value').add_action(join)
 
-spaced_range = (R(r'^[\+\-–−]?\d+(\.d+)?(\(\d\))?$') + Optional(gas_viscosity_units).hide() + (R(r'^[\-±–−~∼˜]$') + R(r'^[\+\-–−]?\d+(\.\d+)?(\(\d\))?$') | R(r'^[\+\-–−]\d+(\.\d+)?(\(\d\))?$')))('value').add_action(join)
+spaced_range = (
+        R(r'^[\+\-–−]?\d+(\.d+)?(\(\d\))?$') + Optional(gas_viscosity_units).hide()
+        + (R(r'^[\-±–−~∼˜]$') + R(r'^[\+\-–−]?\d+(\.\d+)?(\(\d\))?$') | R(r'^[\+\-–−]\d+(\.\d+)?(\(\d\))?$'))
+)('value').add_action(join)
 
-to_range = (ZeroOrMore(R(r'^[\+\-–−]?\d+(\.\d+)?(\(\d\))?$') + Optional(gas_viscosity_units).hide()) + Optional(I('to')) + R(r'^[\+\-–−]?\d+(\.\d+)?(\(\d\))?$'))('value').add_action(join)
+to_range = (ZeroOrMore(R(r'^[\+\-–−]?\d+(\.\d+)?(\(\d\))?$') + Optional(gas_viscosity_units).hide())
+            + Optional(I('to')) + R(r'^[\+\-–−]?\d+(\.\d+)?(\(\d\))?$'))('value').add_action(join)
 
-to_range2 = ((R(r'^[\+\-–−]?\d+(\.\d+)?(\(\d\))?$') + I('<') + Optional(W('dp'))) + I('<') + R(r'^[\+\-–−]?\d+(\.\d+)?(\(\d\))?$'))('value').add_action(join)
+to_range2 = ((R(r'^[\+\-–−]?\d+(\.\d+)?(\(\d\))?$') + I('<') + Optional(W('dp'))) + I('<')
+             + R(r'^[\+\-–−]?\d+(\.\d+)?(\(\d\))?$'))('value').add_action(join)
 
 and_range = (OneOrMore(R(r'^[\+\-–−]?\d+(\.\d+)?(\(\d\))?$') + Optional(gas_viscosity_units).hide() + Optional(comma))
              + Optional(I('and') | comma).hide() + R(r'^[\+\-–−]?\d+(\.\d+)?(\(\d\))?$'))('value').add_action(join)
@@ -350,7 +376,9 @@ power = (
 
 gas_viscosity_value = (power | range1 | value)('gas_viscosity_value')
 
-gas_viscosity_cell = (OneOrMore(gas_viscosity_value) + Optional(delims.hide()) + Optional(gas_viscosity_units))('gas_viscosity_cell')
+gas_viscosity_cell = (
+        OneOrMore(gas_viscosity_value) + Optional(delims.hide()) + Optional(gas_viscosity_units)
+)('gas_viscosity_cell')
 # + Optional(gas_viscosity_units)
 
 '''6.最小流化速度定义'''
@@ -399,18 +427,24 @@ Umf_heading = (
 
 joined_range = R(r'^[\+\-–−]?\d+(\.\\d+)?(\(\d\))?[\-––-−~∼˜]\d+(\.\d+)?(\(\d\))?$')('value').add_action(join)
 
-spaced_range = (R(r'^[\+\-–−]?\d+(\.d+)?(\(\d\))?$') + Optional(Umf_units).hide() + (R(r'^[\-––-−~∼˜±]$') + R(r'^[\+\-–−]?\d+(\.\d+)?(\(\d\))?$') | R(r'^[\+\-–−]\d+(\.\d+)?(\(\d\))?$')))('value').add_action(join)
+spaced_range = (
+        R(r'^[\+\-–−]?\d+(\.d+)?(\(\d\))?$') + Optional(Umf_units).hide()
+        + (R(r'^[\-––-−~∼˜±]$') + R(r'^[\+\-–−]?\d+(\.\d+)?(\(\d\))?$') | R(r'^[\+\-–−]\d+(\.\d+)?(\(\d\))?$'))
+)('value').add_action(join)
 
-to_range = (ZeroOrMore(R(r'^[\+\-–−]?\d+(\.\d+)?(\(\d\))?$') + Optional(Umf_units).hide()) + Optional(I('to')) + R(r'^[\+\-–−]?\d+(\.\d+)?(\(\d\))?$'))('value').add_action(join)
+to_range = (ZeroOrMore(R(r'^[\+\-–−]?\d+(\.\d+)?(\(\d\))?$') + Optional(Umf_units).hide())
+            + Optional(I('to')) + R(r'^[\+\-–−]?\d+(\.\d+)?(\(\d\))?$'))('value').add_action(join)
 
-to_range2 = ((R(r'^[\+\-–−]?\d+(\.\d+)?(\(\d\))?$') + I('<') + Optional(W('dp'))) + I('<') + R(r'^[\+\-–−]?\d+(\.\d+)?(\(\d\))?$'))('value').add_action(join)
+to_range2 = ((R(r'^[\+\-–−]?\d+(\.\d+)?(\(\d\))?$') + I('<') + Optional(W('dp'))) + I('<')
+             + R(r'^[\+\-–−]?\d+(\.\d+)?(\(\d\))?$'))('value').add_action(join)
 
 an_range = (OneOrMore(R(r'^[\+\-–−]?\d+(\.\d+)?(\(\d\))?$') + Optional(Umf_units).hide() + Optional(comma))
              + Optional(I('and') | comma).hide() + R(r'^[\-––-−~∼˜]?\d+(\.\d+)?(\(\d\))?$')
               )('value').add_action(join)
 
 and_range = (R(r'^[\+\-–−]?\d+(\.d+)?(\(\d\))?$') +
-             OneOrMore(R(r'^[\+\-––-−~∼˜±]?\d+(\.\d+)?(\(\d\))?$') + Optional(Umf_units).hide() + Optional(comma)))('value').add_action(join)
+             OneOrMore(R(r'^[\+\-––-−~∼˜±]?\d+(\.\d+)?(\(\d\))?$') + Optional(Umf_units).hide() + Optional(comma))
+             )('value').add_action(join)
 
 range1 = (an_range | and_range | spaced_range | joined_range | to_range2 | to_range).add_action(join)
 
@@ -458,7 +492,10 @@ Temp_value = (Optional(R(r'^[\-–−]$')) + Optional(R(r'^[~∼˜\<\>\≤\≥]$
 Temp_cell = (OneOrMore(Temp_value) + Optional(delims.hide()) + Optional(Temp_units))('Temp_cell')
 
 '''7. 操作温度'''
-temp_range = (Optional(R(r'^[\-–−]$')) + (R(r'^[\+\-–−]?\d+(\.\d+)?[\-–−]\d+(\.\d+)?$') | (R(r'^[\+\-–−]?\d+(\.\d+)?$') + R(r'^[\-–−]$') + R(r'^[\+\-–−]?\d+(\.\d+)?$'))))('temperature').add_action(merge)
+temp_range = (
+        Optional(R(r'^[\-–−]$')) + (R(r'^[\+\-–−]?\d+(\.\d+)?[\-–−]\d+(\.\d+)?$') |
+        (R(r'^[\+\-–−]?\d+(\.\d+)?$') + R(r'^[\-–−]$') + R(r'^[\+\-–−]?\d+(\.\d+)?$')))
+)('temperature').add_action(merge)
 
 temp_value = (Optional(R(r'^[\-–−]$')) + Optional(R(r'^[~∼˜\<\>\≤\≥]$')) + Optional(R(r'^[\-\–\–\−±∓⨤⨦±]$'))
          + R(r'^[\+\-–−]?\d+(\.\d+)?(\(\d\))?$') + Optional(R(r'^[\-\–\–\−±∓⨤⨦±]$')) + Optional(I('and'))
@@ -499,7 +536,10 @@ Press_value = (Optional(R(r'^[\-–−]$')) + Optional(R(r'^[~∼˜\<\>\≤\≥]
 Press_cell = (OneOrMore(Press_value) + Optional(delims.hide()) + Optional(Press_units))('Press_cell')
 
 '''8. 操作压力'''
-press_range = (Optional(R(r'^[\-–−]$')) + (R(r'^[\+\-–−]?\d+(\.\d+)?[\-–−]\d+(\.\d+)?$') | (R(r'^[\+\-–−]?\d+(\.\d+)?$') + R(r'^[\-–−]$') + R(r'^[\+\-–−]?\d+(\.\d+)?$'))))('pressure').add_action(merge)
+press_range = (
+        Optional(R(r'^[\-–−]$')) + (R(r'^[\+\-–−]?\d+(\.\d+)?[\-–−]\d+(\.\d+)?$') |
+                                    (R(r'^[\+\-–−]?\d+(\.\d+)?$') + R(r'^[\-–−]$') + R(r'^[\+\-–−]?\d+(\.\d+)?$')))
+)('pressure').add_action(merge)
 
 
 press_value = (Optional(R(r'^[\-–−]$')) + Optional(R(r'^[~∼˜\<\>\≤\≥]$')) + Optional(R(r'^[\-\–\–\−±∓⨤⨦±]$'))
@@ -525,17 +565,21 @@ diameter_range = (
         R(r'^[\+\-–−]?\d+(\.\d+)?[\-–−]\d+(\.\d+)?$')
 )('diameter').add_action(merge)
 
-diameter_value = (Optional(R(r'^[\-–−]$')) + R(r'^[\+\-–−]?\d+(\.\d+)?$') + Optional(W('±') + R(r'^\d+(\.\d+)?$')))('diameter').add_action(merge)
+diameter_value = (
+        Optional(R(r'^[\-–−]$')) + R(r'^[\+\-–−]?\d+(\.\d+)?$') + Optional(W('±') + R(r'^\d+(\.\d+)?$'))
+)('diameter').add_action(merge)
 
 # diameter_word = (I('of') | I('for') | I('with') |I('using'))('diameter').add_action(merge)
 
-diameter = (diameter_range | diameter_value)('value') #  | diameter_word
+diameter = (diameter_range | diameter_value)('value')  # | diameter_word
 
 diameter_units = ((R('^[µμcm]m$') + Not(W('/'))) | (R('μ|μ') + W('m')))('units').add_action(merge)
 
 diameter_with_units = (diameter + diameter_units)('diam')
 
-diameter_phrase = (Not(W('height')) + Optional(W('of')) + Optional(I('with')) + Optional(W('=')) + diameter_with_units)('diam_phrase')
+diameter_phrase = (
+        Not(W('height')) + Optional(W('of')) + Optional(I('with')) + Optional(W('=')) + diameter_with_units
+)('diam_phrase')
 
 density_range = (
         Optional(R(r'^[\-–−]$')) +
@@ -543,7 +587,8 @@ density_range = (
         R(r'^[\+\-–−]?\d+(\.\d+)?[\-–−]\d+(\.\d+)?$')
 )('density').add_action(merge)
 
-density_value = (Optional(R(r'^[\-–−]$')) + R(r'^[\+\-–−]?\d+(\.\d+)?$') + Optional(W('±') + R(r'^\d+(\.\d+)?$')))('density').add_action(merge)
+density_value = (Optional(R(r'^[\-–−]$')) + R(r'^[\+\-–−]?\d+(\.\d+)?$') + Optional(W('±') + R(r'^\d+(\.\d+)?$'))
+                 )('density').add_action(merge)
 
 # density_word = (I('was') + Optional(I('approximately')))('density').add_action(merge)
 
@@ -555,26 +600,34 @@ density_with_units = (density + density_units)('dens')
 
 density_phrase = (Optional(W('of')) + Optional(I('with')) + Optional(W('=')) + density_with_units)('dens_phrase')
 
-caption_context = Group(subject_phrase | press_phrase | temp_phrase | diameter_phrase | density_phrase)('caption_context')
+caption_context = Group(
+    subject_phrase | press_phrase | temp_phrase | diameter_phrase | density_phrase
+)('caption_context')
 
 
 '''10.单位自成一列'''
 unit_heading = (R('^units?$|^comments?$', re.I))('unit_heading')
 
-unit_particle_diameter_cell = ((R('^[µμcm]?m$') + Not(W('/'))) |
-                          (R('μ|μ') + W('m')))('particle_diameter_units').add_action(merge)('unit_particle_diameter_cell')
+unit_particle_diameter_cell = (
+        (R('^[µμcm]?m$') + Not(W('/'))) | (R('μ|μ') + W('m'))
+)('particle_diameter_units').add_action(merge)('unit_particle_diameter_cell')
 
-unit_particle_density_cell = ((R('[Kk]?g') + R(r'[c]?m[\-–−]?3?')) |
-                         (R('[Kk]?g') + W('/') + R('c?m')))('particle_density_units').add_action(merge)('unit_particle_density_cell')
+unit_particle_density_cell = (
+        (R('[Kk]?g') + R(r'[c]?m[\-–−]?3?')) | (R('[Kk]?g') + W('/') + R('c?m'))
+)('particle_density_units').add_action(merge)('unit_particle_density_cell')
 
 unit_gas_density_cell = (
         (R('[k]?g') + R(r'[c]?m[\-–−]3')) |
         (R('[k]?g')+W('/')+R('[c]?m'))
                          )('gas_density_units').add_action(merge)('unit_gas_density_cell')
 
-unit_gas_viscosity_cell = (R('Pa') + Optional(stop) + Optional(W('.')) + R('s'))('gas_viscosity_units').add_action(merge)('unit_gas_viscosity_cell')
+unit_gas_viscosity_cell = (
+        R('Pa') + Optional(stop) + Optional(W('.')) + R('s')
+)('gas_viscosity_units').add_action(merge)('unit_gas_viscosity_cell')
 
-unit_velocity_cell = ((R('^[cm]?m') + R(r's[\-–−]?1?$')) | (R('^[cm]?m') + W('/') + W('s')))('Umf_units').add_action(merge)('unit_velocity_cell')
+unit_velocity_cell = (
+        (R('^[cm]?m') + R(r's[\-–−]?1?$')) | (R('^[cm]?m') + W('/') + W('s'))
+                      )('Umf_units').add_action(merge)('unit_velocity_cell')
 
 
 class CompoundHeadingParser(BaseParser):
